@@ -7,6 +7,11 @@
   * Certified: "Lint Free!" by jhint
   */
 
+var States = {
+  alien: 0,
+  bullet: 1
+};
+
 var Ship = new Class({
   //the good
 
@@ -83,9 +88,9 @@ var Invader = new Class({
   rowComplete: false,
 
 
-  initialize: function (manager, tweet, row) {
+  initialize: function (manager, type, row) {
     this.manager = manager;
-    this.tweet = tweet;
+    this.type = type;
     this.row = row;
     this.process();
     this.draw();
@@ -102,14 +107,7 @@ var Invader = new Class({
   },
 
   process: function () {
-    var i;
-    if(this.tweet.text.test('lame')) {
-      i = 1;
-    } else if (this.tweet.text.test('dumb')) {
-      i = 2;
-    } else {
-      i = 3;
-    }
+    var i = this.type + 1;
 
     this.image = this.manager.images['invader' + this.manager.folders[this.row % 5] + i];
     this.image_o = this.manager.images['invader' + this.manager.folders[this.row % 5] + i + '_o'];
@@ -152,8 +150,8 @@ var Invader = new Class({
 var Visualization = {
 
   options: {
-    good: ['good'],
-    bad: ['bad','lame','dumb']
+    good: ['good', 'bad'],
+    bad: ['lame','dumb']
   },
 
   regex: {},
@@ -212,9 +210,14 @@ var Visualization = {
       if (e) y++;
       if (x == y && z) {
         this.ship = new Ship(this);
-        this.socket.on('tweet', this.socketListener = function (tweet) {
-          this.process(tweet);
+        this.socket.on('bullet', this.bulletListener = function () {
+          this.shoot();
         }.bind(this));
+        
+        this.socket.on('invader', this.invaderListener = function (i) {
+          this.addInvader(i);
+        }.bind(this));
+        
         this.periodical = this.move.bind(this).periodical(100);
       }
     }.bind(this);
@@ -249,7 +252,8 @@ var Visualization = {
     }
     this.gameisover = true;
     $clear(this.periodical);
-    this.socket.removeListener('tweet', this.socketListener);
+    this.socket.removeListener('bullet', this.bulletListener);
+    this.socket.removeListener('invader', this.invaderListener);
     this.invaders = [];
     this.gen = 0;
     this.i = 0;
@@ -305,25 +309,24 @@ var Visualization = {
     this.ship.slide();
   },
 
-  process: function (tweet) {
-    var text = tweet.text;
-    if (text.test(this.regex.good = this.regex.good || new RegExp(this.options.good.join("|"), 'gi'))) { //it's good.
-      this.ship.shoot();
-    } else {
-      this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
-      var newRow = (this.gen % this.rowWidth) === 0;
-      this.invaders.each(function (invader) {
-        invader.shove(newRow);
-      }.bind(this));
-
-      this.invaders.push(new Invader(this, tweet, Math.ceil((this.gen / this.rowWidth) + 0.0000001)));
-
-      this.gen++;
-
-      this.ship.draw();
-    }
+  shoot: function () {
+    this.ship.shoot();
   },
+  
+  addInvader: function (i) {
+    this.ctx.clearRect(0, 0, this.canvasWidth, this.canvasHeight);
+    var newRow = (this.gen % this.rowWidth) === 0;
+    this.invaders.each(function (invader) {
+      invader.shove(newRow);
+    }.bind(this));
 
+    this.invaders.push(new Invader(this, i, Math.ceil((this.gen / this.rowWidth) + 0.0000001)));
+
+    this.gen++;
+
+    this.ship.draw();
+  },
+  
   propagate: function (move, row) {
     var x;
     for (var i = 0, l = this.invaders.length; i < l; i++) {
